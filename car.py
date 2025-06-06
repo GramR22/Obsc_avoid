@@ -1,6 +1,10 @@
 import math
 import numpy as np
 
+grid = np.zeros((30, 30), dtype=int)
+grid[10, 5:25] = 1
+grid[5:20, 15] = 1
+grid[25:28, 25:28] = 1
 
 
 
@@ -12,7 +16,13 @@ class car:
         self.targetY = None
         self.hasTarget = False
         self.path = []
+        self.mapped_Grid = np.full((30,30),-1,dtype=int)
         self.angle = 0
+        self.scanangles = [0,math.pi/6,math.pi/4,math.pi/3,math.pi/2,
+                           2*(math.pi)/3,3*(math.pi)/4,5*(math.pi)/6,
+                           math.pi,7*(math.pi)/6,5*(math.pi)/4,
+                           4*(math.pi)/3,3*(math.pi)/2,5*(math.pi)/3,
+                           7*(math.pi)/4,11*(math.pi)/6]
         self.velocity = 0
         self.max_velocity = 10
         self.min_velocity = -2
@@ -37,82 +47,38 @@ class car:
         self.angle -= turn_value
 
 
-    def accel(self,acc_value):
-        self.is_accelerating = True
-        if self.velocity + acc_value > self.max_velocity:
-            friction_coef = math.log1p(self.max_velocity - self.velocity) 
-            self.velocity += acc_value * friction_coef
-            self.velocity = np.clip(self.velocity,self.min_velocity,self.max_velocity)
-        # np.clip enforces that is remains in the min and max
-        # ensures it does not go above the maximum
-        # log1p(x) = log(1 + x) this is a simulation of friction or the slow down of the car
-        else:
-            friction_coef = math.log1p(self.max_velocity - self.velocity)
-            self.velocity += acc_value * friction_coef
-
-
-    def decel(self, decel_value):
-        self.is_decelerating = True
-        if self.velocity - decel_value < self.min_velocity:
-            friction_coef = math.log1p(abs(self.max_velocity + self.velocity)) 
-            self.velocity += decel_value * friction_coef
-            self.velocity = np.clip(self.velocity,self.min_velocity,self.max_velocity)
-            #ensures it does not go below the minimum/reverse max
-            #log1p(x) for the friction
-        else:
-            if self.velocity < 0:
-                friction_coef = math.log1p(abs(self.min_velocity - self.velocity))
-            else:
-                friction_coef = math.log1p(abs(self.max_velocity - self.velocity))
-            self.velocity -= decel_value * friction_coef
-            #conditions for handling negetive numbers
-
-
     def update(self, acc_input = 0, steering_input = 0):
 
         self.angle += steering_input
         # adjusts the steering angle based off of an input from the ai model
 
         if acc_input > 0:
-            if self.velocity + acc_input > self.max_velocity:
-                friction_coef = math.log1p(self.max_velocity - self.velocity) 
-                self.velocity += acc_input * friction_coef
-                self.velocity = min(self.velocity,self.max_velocity)
-                self.is_accelerating = True
-                self.is_decelerating = False
-                # np.clip enforces that is remains in the min and max
-                # ensures it does not go above the maximum
-                # log1p(x) = log(1 + x) this is a simulation of friction or the slow down of the car
-            elif self.velocity + acc_input >= self.max_velocity:
-                self.velocity = self.max_velocity
-            else:
-                friction_coef = math.log1p(self.max_velocity - self.velocity)
-                self.velocity += acc_input * friction_coef
+        
+            friction_coef = math.log1p(self.max_velocity - self.velocity) 
+            self.velocity += acc_input * friction_coef
+            self.velocity = min(self.velocity,self.max_velocity)
+            self.is_accelerating = True
+            self.is_decelerating = False
+            # np.clip enforces that is remains in the min and max
+            # ensures it does not go above the maximum
+            # log1p(x) = log(1 + x) this is a simulation of friction or the slow down of      		the car
+
 
         elif acc_input < 0:
-            if self.velocity + acc_input < self.min_velocity:
-                friction_coef = math.log1p(abs(self.min_velocity - self.velocity))
-                self.velocity += acc_input * friction_coef
-                self.velocity = max(self.velocity,self.min_velocity)
-                #ensures it does not go below the minimum/reverse max
-                #log1p(x) for the friction
+            #ensures it does not go below the minimum/reverse max
+            #log1p(x) for the friction
                 
-            else:
-                if self.velocity < 0:
-                    friction_coef = math.log1p(abs(self.min_velocity - self.velocity))
-                else:
-                    friction_coef = math.log1p(abs(self.max_velocity - self.velocity))
-                self.velocity += acc_input * friction_coef
-                #conditions for handling negetive numbers
+            friction_coef = math.log1p(abs(self.min_velocity - self.velocity))
+    
+            self.velocity += acc_input * friction_coef	
+            self.velocity = max(self.velocity,self.min_velocity)
             self.is_accelerating = False
             self.is_decelerating = True
         else:
             self.is_accelerating = False
             self.is_decelerating = False    
             self.coast()
-      
-        self.velocity = np.clip(self.velocity,self.min_velocity,self.max_velocity)
-        # np.clip enforces that is remains in the min and max
+    
         self.pos_Update()
 
 
@@ -124,7 +90,7 @@ class car:
         
     
     def set_Target(self,target):
-        if self.check_collision(grid) == False:
+        if self.check_collision(grid,target) == False:
             self.targetX = target[0]
             self.targetY = target[1]
         else:
@@ -139,12 +105,31 @@ class car:
         # its a plus because it's euclidean distance
 
 
-    def check_collision(self,grid):
-        pass
+    def check_collision(self,grid,target):
+        if grid[target[1]][target[0]] == 1:
+            return True
+        else:
+            return False
 
 
     def scan_Grid(self):
-        pass
+        for pulse in self.scanangles:
+            for i in (1,2):
+                grid_X = int(self.x + i * math.cos(pulse))
+                grid_Y = int(self.y + i * math.sin(pulse))
+                # uses basic polar equations to determin the area to scan and where
+                # because it is scaning at a radius of 2 it will check 1 then two for each given angle
+
+                if not (0 <= int(grid_X) < 30 and 0 <= int(grid_Y) < 30):
+                    break
+                    # if its below 0 or above 30 it is not in the grid as i made it 30 x 30
+                if grid[grid_Y][grid_X] == 1:
+                    self.mapped_Grid[grid_Y][grid_X] = 1
+                    break
+                    # something is here :O
+                else:
+                    self.mapped_Grid[grid_Y][grid_X] = 0
+                    # nothing in this area
 
 
     def render(self):
