@@ -12,18 +12,33 @@ autnomous simulation
 
 
 Methods  
-    -needs method for acceleration and deceleration
-    -needs method to update its postion on the grid
-    -needs a method to adjust the angle(Turn Left or Right) of the car
+    -logic for coasting
+    -method for acceleration and deceleration
+    -method to update its postion on the grid
+    -method to adjust the angle(Turn Left or Right) of the car
     
 accel/decel
-    -needs to limit top speed and minimum speed or reverse speed
+    -limit top speed and minimum speed or reverse speed
 
 update
-    -needs to change the angle of the car by using cos to turn right and sin to turn left
+    -calls coasting fucntion to simulate rolling friction
+    -change the angle of the car by using cos to turn right and sin to turn left
     -uses polar equations to determine the direction of the vehicle
     RIGHT
         velocity + cos(angle)
     
     LEFT
         velocity + sin(angle)
+
+
+Simulated lidar
+    used unit circle and polar cordinates to scan 360 degrees
+
+
+Collision logic
+    checks a main grid for collisions based on where it is and where it plans to go
+    ...
+
+Studied Controls and how it works.
+    https://www.digikey.com/en/maker/tutorials/2024/implementing-a-pid-controller-algorithm-in-python
+    https://www.youtube.com/watch?v=XfAt6hNV8XM&t=8s 
