@@ -15,6 +15,13 @@ class car:
         self.targetX = None
         self.targetY = None
         self.hasTarget = False
+        self.Intergral_E = 0
+        self.derivitave_E = 0
+        self.previous_E = 0
+        self.Sintegral_E = 0
+        self.Sderivative_E = 0
+        self.Sprevious_E = 0
+
         self.path = []
         self.mapped_Grid = np.full((30,30),-1,dtype=int)
         self.angle = 0
@@ -29,6 +36,8 @@ class car:
         self.is_accelerating = False
         self.is_decelerating = False
 
+    def get_mappedGrid(self):
+        return self.mapped_Grid
 
     def coast(self):
         decay = .95 * (1 - (abs(self.velocity)/self.max_velocity))
@@ -39,16 +48,56 @@ class car:
         # to ensure it doesnt get stuck aproachcing 0 forever it is hard set to 0 if < .05
 
 
-    def turn_R(self, turn_value):
-        self.angle += turn_value
+    def steerin_pid(self,dt  = .1):
+        if self.targetX is None or self.targetY is None:
+            return 0
+        desired_angle = math.atan2(self.targetY - self.y, self.targetX - self.x)
+        # gives desired angle from atan2(delta Y, delta X)
+        
+        # atan2 returns the angle of a vector from 0,0 
+        
+        
+        angle_error = desired_angle - self.angle
+        # proportional Error (P)
+        # if the car is far off course this number should be huge if it is not it will be smaller
 
 
-    def turn_L(self, turn_value):
-        self.angle -= turn_value
+        angle_error = (angle_error + math.pi) % (2* math.pi) - math.pi
+        # normalize it from -pi , pi
+
+        self.AIntergral_E += angle_error * dt
+        self.Aderivitave_E = (angle_error - self.Aprevious_E)/dt
+        self.Aprevious_E = angle_error
+        # calculations for intergral error and derivitive error
+        # need to track error because it will be constantly checking as adustments are made
 
 
-    def update(self, acc_input = 0, steering_input = 0):
 
+        output = (self.kp * angle_error + self.ki * self.AIntergral_E + self.kd* self.Aderivitave_E)
+        
+        return output
+
+    def speed_pid(self, dt=0.1):
+        distance = self.set_heading()
+
+        if distance < 0.5:  # if very close, no more speed needed
+            return 0
+
+        # PID calculations
+        self.Sintegral_E += distance * dt
+        self.Sderivative_E = (distance - self.Sprevious_E) / dt
+        self.Sprevious_E = distance
+
+        # PID output: acceleration input
+        output = (self.kp * distance +self.ki * self.Sintegral_E +self.kd * self.Sderivative_E)
+        return output
+
+
+
+    def update(self, dt = .1):
+
+        acc_input = self.speed_pid(dt)
+        steering_input = self.steerin_pid(dt)
         self.angle += steering_input
         # adjusts the steering angle based off of an input from the ai model
 
